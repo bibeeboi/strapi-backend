@@ -1,6 +1,6 @@
 services:
   strapi:
-    container_name: strapi-backend
+    container_name: strapi
     build: .
     image: strapi:latest
     restart: unless-stopped
