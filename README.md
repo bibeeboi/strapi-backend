@@ -59,3 +59,8 @@ Feel free to check out the [Strapi GitHub repository](https://github.com/strapi/
 ---
 
 <sub>🤫 Psst! [Strapi is hiring](https://strapi.io/careers).</sub>
+
+docker run -d \
+  --name fe \
+  -p 3000:3000 \
+  fe

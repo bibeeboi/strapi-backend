@@ -1,3 +1,4 @@
+
 import type { Core } from '@strapi/strapi';
 
 const config = ({ env }: Core.Config.Shared.ConfigParams): Core.Config.Server => ({
@@ -9,6 +10,7 @@ const config = ({ env }: Core.Config.Shared.ConfigParams): Core.Config.Server =>
   webhooks: {
     populateRelations: env.bool('WEBHOOKS_POPULATE_RELATIONS', false),
   },
+  url: 'http://localhost/backend',
 });
 
 export default config;
