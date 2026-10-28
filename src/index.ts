@@ -37,12 +37,10 @@ export default {
       if (isSuperAdmin) return next();
 
       if (context.action === 'create' && org) {
-        // create pakai document service -> connect relation butuh documentId
         (context.params as any).data.organization = org.documentId;
       }
 
       if (['findMany', 'findOne'].includes(context.action) && org) {
-        // filter diterjemahkan ke SQL join pakai kolom id numerik, bukan documentId
         (context.params as any).filters = {
           ...(context.params as any).filters,
           organization: org.id,
@@ -53,5 +51,26 @@ export default {
     });
   },
 
-  bootstrap(/* { strapi }: { strapi: Core.Strapi } */) {},
+  bootstrap({ strapi }: { strapi: Core.Strapi }) {
+    strapi.db.lifecycles.subscribe({
+      models: ['admin::user'],
+
+      async afterCreate(event) {
+        const { result } = event;
+
+        const roles: any[] = result?.roles ?? [];
+        const isOperator = roles.some((r) => r.name === 'Operator');
+        if (!isOperator || !result?.email) return;
+
+        const existing = await strapi.documents('api::operator.operator').findFirst({
+          filters: { email: result.email },
+        });
+        if (existing) return;
+
+        await strapi.documents('api::operator.operator').create({
+          data: { email: result.email },
+        });
+      },
+    });
+  },
 };
