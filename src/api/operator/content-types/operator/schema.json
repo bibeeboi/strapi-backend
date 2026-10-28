@@ -1,0 +1,26 @@
+{
+  "kind": "collectionType",
+  "collectionName": "operators",
+  "info": {
+    "singularName": "operator",
+    "pluralName": "operators",
+    "displayName": "Operator"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "email": {
+      "type": "string",
+      "required": false,
+      "unique": false
+    },
+    "organization": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::organization.organization",
+      "inversedBy": "operators"
+    }
+  }
+}

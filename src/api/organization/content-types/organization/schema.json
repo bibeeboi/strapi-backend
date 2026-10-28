@@ -16,12 +16,6 @@
       "required": true,
       "unique": true
     },
-    "users": {
-      "type": "relation",
-      "relation": "oneToMany",
-      "target": "plugin::users-permissions.user",
-      "mappedBy": "organization"
-    },
     "beritas": {
       "type": "relation",
       "relation": "oneToMany",
@@ -38,6 +32,12 @@
       "type": "relation",
       "relation": "oneToMany",
       "target": "api::gallery.gallery",
+      "mappedBy": "organization"
+    },
+    "operators": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::operator.operator",
       "mappedBy": "organization"
     }
   }
