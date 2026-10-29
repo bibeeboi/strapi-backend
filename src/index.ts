@@ -1,6 +1,12 @@
 import type { Core } from '@strapi/strapi';
 
-const targets = ['api::berita.berita', 'api::video.video', 'api::gallery.gallery'];
+const targets = [
+  'api::berita.berita',
+  'api::video.video',
+  'api::gallery.gallery',
+  'api::quick-action.quick-action',
+  'api::site-setting.site-setting',
+];
 
 async function getAdminOrgAndRole(
   strapi: Core.Strapi,

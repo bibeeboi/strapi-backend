@@ -39,6 +39,18 @@
       "relation": "oneToMany",
       "target": "api::operator.operator",
       "mappedBy": "organization"
+    },
+    "site_settings": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::site-setting.site-setting",
+      "mappedBy": "organization"
+    },
+    "quick_actions": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::quick-action.quick-action",
+      "mappedBy": "organization"
     }
   }
 }
