@@ -64,3 +64,4 @@ docker run -d \
   --name fe \
   -p 3000:3000 \
   fe
+
