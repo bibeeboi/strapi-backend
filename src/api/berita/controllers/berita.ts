@@ -1,5 +1,34 @@
 import { factories } from '@strapi/strapi';
 
+async function resolveAdminOrganization(strapi: any, adminUser: any) {
+  const adminRecord = await strapi.db.query('admin::user').findOne({
+    where: { id: adminUser.id },
+    populate: ['roles'],
+  });
+
+  const isSuperAdmin = adminRecord?.roles?.some(
+    (role: any) => role.code === 'strapi-super-admin'
+  );
+
+  if (isSuperAdmin) {
+    return { isSuperAdmin: true, organizationId: null };
+  }
+
+  const operator = await strapi.db.query('api::operator.operator').findOne({
+    where: { email: adminUser.email },
+    populate: ['organization'],
+  });
+
+  if (!operator?.organization) {
+    return { isSuperAdmin: false, organizationId: null };
+  }
+
+  return {
+    isSuperAdmin: false,
+    organizationId: operator.organization.id,
+  };
+}
+
 export default factories.createCoreController(
   'api::berita.berita',
   ({ strapi }) => ({
@@ -7,7 +36,6 @@ export default factories.createCoreController(
     async find(ctx) {
       const user = ctx.state.user;
 
-      // Public
       if (!user) {
         return await super.find(ctx);
       }
@@ -22,21 +50,37 @@ export default factories.createCoreController(
         });
 
       if (!currentUser?.organization) {
-        return ctx.forbidden(
-          'User belum memiliki organization'
-        );
+        return ctx.forbidden('User belum memiliki organization');
       }
 
-      const organizationId = currentUser.organization.id;
-
       const query = ctx.query as any;
-
       query.filters = {
         ...(query.filters || {}),
-        organization: {
-          id: organizationId,
-        },
+        organization: { id: currentUser.organization.id },
       };
+
+      return await super.find(ctx);
+    },
+
+    async findAdmin(ctx) {
+      const adminUser = ctx.state.adminUser;
+      if (!adminUser) {
+        return ctx.unauthorized('Login admin diperlukan');
+      }
+
+      const { isSuperAdmin, organizationId } = await resolveAdminOrganization(strapi, adminUser);
+
+      if (!isSuperAdmin && !organizationId) {
+        return ctx.forbidden('Admin belum terhubung ke organization');
+      }
+
+      const query = ctx.query as any;
+      if (!isSuperAdmin) {
+        query.filters = {
+          ...(query.filters || {}),
+          organization: { id: organizationId },
+        };
+      }
 
       return await super.find(ctx);
     },
@@ -58,28 +102,48 @@ export default factories.createCoreController(
         });
 
       if (!currentUser?.organization) {
-        return ctx.forbidden(
-          'User belum memiliki organization'
-        );
+        return ctx.forbidden('User belum memiliki organization');
       }
-
-      const organizationId = currentUser.organization.id;
 
       const berita = await strapi
         .query('api::berita.berita')
         .findOne({
           where: {
             documentId: ctx.params.documentId,
-            organization: {
-              id: organizationId,
-            },
+            organization: { id: currentUser.organization.id },
           },
         });
 
       if (!berita) {
-        return ctx.notFound(
-          'Berita tidak ditemukan atau bukan milik organization Anda'
-        );
+        return ctx.notFound('Berita tidak ditemukan atau bukan milik organization Anda');
+      }
+
+      return await super.findOne(ctx);
+    },
+
+    async findOneAdmin(ctx) {
+      const adminUser = ctx.state.adminUser;
+      if (!adminUser) {
+        return ctx.unauthorized('Login admin diperlukan');
+      }
+
+      const { isSuperAdmin, organizationId } = await resolveAdminOrganization(strapi, adminUser);
+
+      if (!isSuperAdmin && !organizationId) {
+        return ctx.forbidden('Admin belum terhubung ke organization');
+      }
+
+      const berita = await strapi
+        .query('api::berita.berita')
+        .findOne({
+          where: {
+            documentId: ctx.params.documentId,
+            ...(isSuperAdmin ? {} : { organization: { id: organizationId } }),
+          },
+        });
+
+      if (!berita) {
+        return ctx.notFound('Berita tidak ditemukan atau bukan milik organization Anda');
       }
 
       return await super.findOne(ctx);
@@ -89,31 +153,43 @@ export default factories.createCoreController(
       const user = ctx.state.user;
 
       if (!user) {
-        return ctx.unauthorized(
-          'Login diperlukan'
-        );
+        return ctx.unauthorized('Login diperlukan');
       }
 
       const currentUser = await strapi
         .query('plugin::users-permissions.user')
         .findOne({
           where: { id: user.id },
-          populate: {
-            organization: true,
-          },
+          populate: { organization: true },
         });
 
       if (!currentUser?.organization) {
-        return ctx.forbidden(
-          'User belum memiliki organization'
-        );
+        return ctx.forbidden('User belum memiliki organization');
       }
-
-      const organizationId = currentUser.organization.id;
 
       ctx.request.body.data = {
         ...(ctx.request.body.data || {}),
-        organization: organizationId,
+        organization: currentUser.organization.id,
+      };
+
+      return await super.create(ctx);
+    },
+
+    async createAdmin(ctx) {
+      const adminUser = ctx.state.adminUser;
+      if (!adminUser) {
+        return ctx.unauthorized('Login admin diperlukan');
+      }
+
+      const { isSuperAdmin, organizationId } = await resolveAdminOrganization(strapi, adminUser);
+
+      if (!isSuperAdmin && !organizationId) {
+        return ctx.forbidden('Admin belum terhubung ke organization');
+      }
+
+      ctx.request.body.data = {
+        ...(ctx.request.body.data || {}),
+        ...(isSuperAdmin ? {} : { organization: organizationId }),
       };
 
       return await super.create(ctx);
@@ -123,9 +199,7 @@ export default factories.createCoreController(
       const user = ctx.state.user;
 
       if (!user) {
-        return ctx.unauthorized(
-          'Login diperlukan'
-        );
+        return ctx.unauthorized('Login diperlukan');
       }
 
       const currentUser = await strapi
@@ -138,33 +212,58 @@ export default factories.createCoreController(
         });
 
       if (!currentUser?.organization) {
-        return ctx.forbidden(
-          'User belum memiliki organization'
-        );
+        return ctx.forbidden('User belum memiliki organization');
       }
-
-      const organizationId = currentUser.organization.id;
 
       const berita = await strapi
         .query('api::berita.berita')
         .findOne({
           where: {
             documentId: ctx.params.documentId,
-            organization: {
-              id: organizationId,
-            },
+            organization: { id: currentUser.organization.id },
           },
         });
 
       if (!berita) {
-        return ctx.forbidden(
-          'Anda tidak dapat mengubah berita organization lain'
-        );
+        return ctx.forbidden('Anda tidak dapat mengubah berita organization lain');
       }
 
       ctx.request.body.data = {
         ...(ctx.request.body.data || {}),
-        organization: organizationId,
+        organization: currentUser.organization.id,
+      };
+
+      return await super.update(ctx);
+    },
+
+    async updateAdmin(ctx) {
+      const adminUser = ctx.state.adminUser;
+      if (!adminUser) {
+        return ctx.unauthorized('Login admin diperlukan');
+      }
+
+      const { isSuperAdmin, organizationId } = await resolveAdminOrganization(strapi, adminUser);
+
+      if (!isSuperAdmin && !organizationId) {
+        return ctx.forbidden('Admin belum terhubung ke organization');
+      }
+
+      const berita = await strapi
+        .query('api::berita.berita')
+        .findOne({
+          where: {
+            documentId: ctx.params.documentId,
+            ...(isSuperAdmin ? {} : { organization: { id: organizationId } }),
+          },
+        });
+
+      if (!berita) {
+        return ctx.forbidden('Anda tidak dapat mengubah berita organization lain');
+      }
+
+      ctx.request.body.data = {
+        ...(ctx.request.body.data || {}),
+        ...(isSuperAdmin ? {} : { organization: organizationId }),
       };
 
       return await super.update(ctx);
@@ -174,9 +273,7 @@ export default factories.createCoreController(
       const user = ctx.state.user;
 
       if (!user) {
-        return ctx.unauthorized(
-          'Login diperlukan'
-        );
+        return ctx.unauthorized('Login diperlukan');
       }
 
       const currentUser = await strapi
@@ -189,28 +286,48 @@ export default factories.createCoreController(
         });
 
       if (!currentUser?.organization) {
-        return ctx.forbidden(
-          'User belum memiliki organization'
-        );
+        return ctx.forbidden('User belum memiliki organization');
       }
-
-      const organizationId = currentUser.organization.id;
 
       const berita = await strapi
         .query('api::berita.berita')
         .findOne({
           where: {
             documentId: ctx.params.documentId,
-            organization: {
-              id: organizationId,
-            },
+            organization: { id: currentUser.organization.id },
           },
         });
 
       if (!berita) {
-        return ctx.forbidden(
-          'Anda tidak dapat menghapus berita organization lain'
-        );
+        return ctx.forbidden('Anda tidak dapat menghapus berita organization lain');
+      }
+
+      return await super.delete(ctx);
+    },
+
+    async deleteAdmin(ctx) {
+      const adminUser = ctx.state.adminUser;
+      if (!adminUser) {
+        return ctx.unauthorized('Login admin diperlukan');
+      }
+
+      const { isSuperAdmin, organizationId } = await resolveAdminOrganization(strapi, adminUser);
+
+      if (!isSuperAdmin && !organizationId) {
+        return ctx.forbidden('Admin belum terhubung ke organization');
+      }
+
+      const berita = await strapi
+        .query('api::berita.berita')
+        .findOne({
+          where: {
+            documentId: ctx.params.documentId,
+            ...(isSuperAdmin ? {} : { organization: { id: organizationId } }),
+          },
+        });
+
+      if (!berita) {
+        return ctx.forbidden('Anda tidak dapat menghapus berita organization lain');
       }
 
       return await super.delete(ctx);
