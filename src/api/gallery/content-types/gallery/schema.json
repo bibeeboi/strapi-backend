@@ -35,6 +35,9 @@
       "relation": "manyToOne",
       "target": "api::organization.organization",
       "inversedBy": "galleries"
+    },
+    "date": {
+      "type": "date"
     }
   }
 }
